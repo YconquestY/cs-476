@@ -1,0 +1,4 @@
+# app
+programms/*/build-release/
+# FPGA config
+systems/singleCore/sandbox/
