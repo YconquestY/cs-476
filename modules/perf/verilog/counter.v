@@ -14,8 +14,8 @@ module Counter #(parameter WIDTH = 32)
         else if (enable && ~disabled)
             count <= count + 1;
     end
-
 endmodule
+
 module profileCi #(parameter [7:0] customId = 8'h00)
                   (input wire start,
                    input wire clock,
@@ -57,5 +57,3 @@ module profileCi #(parameter [7:0] customId = 8'h00)
     end
 
 endmodule
-
-
