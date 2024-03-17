@@ -3,16 +3,15 @@ module Counter #(parameter WIDTH = 32)
                  input wire reset, 
                  input wire enable,
                  input wire disabled,
-                 input wire counterReset,
                  output reg [WIDTH-1:0] count);
 
     always @(posedge clock or posedge reset) begin
         if (reset)
             count <= 0;
-        else if (counterReset)
-            count <= 0;
         else if (enable && ~disabled)
             count <= count + 1;
+        else if (disabled)
+            count <= 0;
     end
 endmodule
 
@@ -31,10 +30,10 @@ module profileCi #(parameter [7:0] customId = 8'h00)
     wire [31:0] counter0, counter1, counter2, counter3;
 
     // Instantiate counters
-    Counter #(32) counter_inst0 (.clock(clock), .reset(reset), .enable(valueB[0]), .disabled(valueB[4]), .counterReset(valueB[8]), .count(counter0));
-    Counter #(32) counter_inst1 (.clock(clock), .reset(reset), .enable(valueB[1]), .disabled(valueB[5]), .counterReset(valueB[9]), .count(counter1));
-    Counter #(32) counter_inst2 (.clock(clock), .reset(reset), .enable(valueB[2]), .disabled(valueB[6]), .counterReset(valueB[10]), .count(counter2));
-    Counter #(32) counter_inst3 (.clock(clock), .reset(reset), .enable(valueB[3]), .disabled(valueB[7]), .counterReset(valueB[11]), .count(counter3));
+    Counter #(32) counter_inst0 (.clock(clock), .reset(valueB[8]) , .enable(valueB[0])           , .disabled(valueB[4]), .count(counter0));
+    Counter #(32) counter_inst1 (.clock(clock), .reset(valueB[9]) , .enable(valueB[1] && stall)  , .disabled(valueB[5]), .count(counter1));
+    Counter #(32) counter_inst2 (.clock(clock), .reset(valueB[10]), .enable(valueB[2] && busIdle), .disabled(valueB[6]), .count(counter2));
+    Counter #(32) counter_inst3 (.clock(clock), .reset(valueB[11]), .enable(valueB[3])           , .disabled(valueB[7]), .count(counter3));
 
     // Output logic
     always @(posedge clock or posedge reset) begin

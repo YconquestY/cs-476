@@ -27,6 +27,12 @@ int main () {
   uint32_t grayPixels;
   vga[2] = swap_u32(2);
   vga[3] = swap_u32((uint32_t) &grayscale[0]);
+
+  // enable counters 0, 1, and 2
+  asm volatile ("l.nios_rrr r0,r0,%[in2], 0xB"::[in2]"r"((uint32_t) 7));
+
+  uint32_t result,
+           frameId = 0;
   while(1) {
     uint32_t * gray = (uint32_t *) &grayscale[0];
     takeSingleImageBlocking((uint32_t) &rgb565[0]);
@@ -40,5 +46,13 @@ int main () {
         grayscale[line*camParams.nrOfPixelsPerLine+pixel] = gray;
       }
     }
+    printf("frame %u", frameId);
+    for (uint32_t counterId = 0; counterId < 2; counterId++) {
+      asm volatile ("l.nios_rrr %[out1],%[in1],r0, 0xB":[out1]"=r"(result)
+                                                       :[in1]"r"(counterId));
+      printf("\tcounter %u: %u", counterId, result);
+    }
+    printf("\n");
+    frameId++;
   }
 }
