@@ -5,13 +5,11 @@ module Counter #(parameter WIDTH = 32)
                  input wire disabled,
                  output reg [WIDTH-1:0] count);
 
-    always @(posedge clock or posedge reset) begin
-        if (reset)
-            count <= 0;
-        else if (enable && ~disabled)
-            count <= count + 1;
-        else if (disabled)
-            count <= 0;
+    always @(posedge clock) begin
+        count <= (reset == 1) ? {WIDTH{1'b0}}
+                              : (enable == 0) ? count
+                                              : (disabled == 0) ? count + 1
+                                                                : count;
     end
 endmodule
 
@@ -28,12 +26,13 @@ module profileCi #(parameter [7:0] customId = 8'h00)
                    output reg [31:0] result);
 
     wire [31:0] counter0, counter1, counter2, counter3;
+    reg         control;
 
     // Instantiate counters
-    Counter #(32) counter_inst0 (.clock(clock), .reset(valueB[8]) , .enable(valueB[0])           , .disabled(valueB[4]), .count(counter0));
-    Counter #(32) counter_inst1 (.clock(clock), .reset(valueB[9]) , .enable(valueB[1] && stall)  , .disabled(valueB[5]), .count(counter1));
-    Counter #(32) counter_inst2 (.clock(clock), .reset(valueB[10]), .enable(valueB[2] && busIdle), .disabled(valueB[6]), .count(counter2));
-    Counter #(32) counter_inst3 (.clock(clock), .reset(valueB[11]), .enable(valueB[3])           , .disabled(valueB[7]), .count(counter3));
+    Counter #(32) counter_inst0 (.clock(clock), .reset(control[8]  || reset), .enable(valueB[0])           , .disabled(valueB[4]), .count(counter0));
+    Counter #(32) counter_inst1 (.clock(clock), .reset(control[9]  || reset), .enable(valueB[1] && stall)  , .disabled(valueB[5]), .count(counter1));
+    Counter #(32) counter_inst2 (.clock(clock), .reset(control[10] || reset), .enable(valueB[2] && busIdle), .disabled(valueB[6]), .count(counter2));
+    Counter #(32) counter_inst3 (.clock(clock), .reset(control[11] || reset), .enable(valueB[3])           , .disabled(valueB[7]), .count(counter3));
 
     // Output logic
     always @(posedge clock or posedge reset) begin
@@ -41,6 +40,7 @@ module profileCi #(parameter [7:0] customId = 8'h00)
             done <= 0;
             result <= 0;
         end else if (start && (ciN == customId)) begin
+            control <= valueB;
             done <= 1;
             case (valueA[1:0])
                 2'b00: result <= counter0;
