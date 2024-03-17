@@ -47,7 +47,7 @@ int main () {
       }
     }
     printf("frame %u", frameId);
-    for (uint32_t counterId = 0; counterId < 2; counterId++) {
+    for (uint32_t counterId = 0; counterId < 3; counterId++) {
       asm volatile ("l.nios_rrr %[out1],%[in1],r0, 0xB":[out1]"=r"(perf)
                                                        :[in1]"r"(counterId));
       printf("\tcounter %u: %u", counterId, perf);
