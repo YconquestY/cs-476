@@ -653,15 +653,15 @@ module or1420SingleCore ( input wire         clock12MHz,
    * Here we define the performance counter
    *
    */
-  profileCi #(.customId(0xB)) perfCounter (.start(s_cpu1CiStart),
-                                           .clock(s_systemClock),
-                                           .reset(s_cpuReset),
-                                           .stall(s_cpuIsStalled),
-                                           .busIdle(s_busIdle),
-                                           .valueA(s_cpu1CiDataA),
-                                           .valueB(s_cpu1CiDataB),
-                                           .ciN(s_cpu1CiN),
-                                           .done(s_profileCiDone),
-                                           .result(s_profileCiResult));
+  profileCi #(.customId(8'hB)) perfCounter (.start(s_cpu1CiStart),
+                                            .clock(s_systemClock),
+                                            .reset(s_cpuReset),
+                                            .stall(s_cpuIsStalled),
+                                            .busIdle(s_busIdle),
+                                            .valueA(s_cpu1CiDataA),
+                                            .valueB(s_cpu1CiDataB),
+                                            .ciN(s_cpu1CiN),
+                                            .done(s_profileCiDone),
+                                            .result(s_profileCiResult));
  
 endmodule
