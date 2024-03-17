@@ -26,7 +26,7 @@ module profileCi #(parameter [7:0] customId = 8'h00)
                    output reg [31:0] result);
 
     wire [31:0] counter0, counter1, counter2, counter3;
-    reg         control;
+    reg  [31:0] control;
 
     // Instantiate counters
     Counter #(32) counter_inst0 (.clock(clock), .reset(control[8]  || reset), .enable(valueB[0])           , .disabled(valueB[4]), .count(counter0));
