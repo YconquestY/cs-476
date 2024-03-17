@@ -29,10 +29,10 @@ module profileCi #(parameter [7:0] customId = 8'h00)
     reg  [31:0] control;
 
     // Instantiate counters
-    Counter #(32) counter_inst0 (.clock(clock), .reset(control[8]  || reset), .enable(valueB[0])           , .disabled(valueB[4]), .count(counter0));
-    Counter #(32) counter_inst1 (.clock(clock), .reset(control[9]  || reset), .enable(valueB[1] && stall)  , .disabled(valueB[5]), .count(counter1));
-    Counter #(32) counter_inst2 (.clock(clock), .reset(control[10] || reset), .enable(valueB[2] && busIdle), .disabled(valueB[6]), .count(counter2));
-    Counter #(32) counter_inst3 (.clock(clock), .reset(control[11] || reset), .enable(valueB[3])           , .disabled(valueB[7]), .count(counter3));
+    Counter #(32) counter_inst0 (.clock(clock), .reset(control[8]  || reset), .enable(control[0])           , .disabled(control[4]), .count(counter0));
+    Counter #(32) counter_inst1 (.clock(clock), .reset(control[9]  || reset), .enable(control[1] && stall)  , .disabled(control[5]), .count(counter1));
+    Counter #(32) counter_inst2 (.clock(clock), .reset(control[10] || reset), .enable(control[2] && busIdle), .disabled(control[6]), .count(counter2));
+    Counter #(32) counter_inst3 (.clock(clock), .reset(control[11] || reset), .enable(control[3])           , .disabled(control[7]), .count(counter3));
 
     // Output logic
     always @(posedge clock or posedge reset) begin
