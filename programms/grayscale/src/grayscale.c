@@ -32,8 +32,8 @@ int main () {
            perf = 0,
            frameId = 0;
   while(1) {
-    // enable counters 0, 1, and 2
-    asm volatile ("l.nios_rrr r0,r0,%[in2], 0xB"::[in2]"r"(control));
+    asm volatile ("l.nios_rrr r0,r0,%[in2], 0xB"::[in2]"r"(control << 4)); // disable counters 0, 1, and 2
+    asm volatile ("l.nios_rrr r0,r0,%[in2], 0xB"::[in2]"r"(control));      // enable  counters 0, 1, and 2
 
     uint32_t * gray = (uint32_t *) &grayscale[0];
     takeSingleImageBlocking((uint32_t) &rgb565[0]);

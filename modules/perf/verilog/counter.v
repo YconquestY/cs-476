@@ -6,10 +6,15 @@ module Counter #(parameter WIDTH = 32)
                  output reg [WIDTH-1:0] count);
 
     always @(posedge clock) begin
-        count <= (reset == 1) ? {WIDTH{1'b0}}
-                              : (enable == 0) ? count
-                                              : (disabled == 0) ? count + 1
-                                                                : count;
+        if (reset || disabled) begin
+            count <= 0;
+        end
+        else if (enable && ~disabled) begin
+            count <= count + 1;
+        end
+        else begin
+            count <= count;
+        end
     end
 endmodule
 
