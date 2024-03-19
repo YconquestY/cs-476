@@ -30,14 +30,19 @@ int main () {
   while(1) {
     uint32_t * gray = (uint32_t *) &grayscale[0];
     takeSingleImageBlocking((uint32_t) &rgb565[0]);
-    asm volatile ("l.nios_rrr r0,r0,%[in2],0xC"::[in2]"r"(7));
+    asm volatile ("l.nios_rrr r0,r0,%[in2],0xC"::[in2]"r"(7)); // enable counters 0,1,2
     for (int line = 0; line < camParams.nrOfLinesPerImage; line++) {
       for (int pixel = 0; pixel < camParams.nrOfPixelsPerLine; pixel++) {
         uint16_t rgb = swap_u16(rgb565[line*camParams.nrOfPixelsPerLine+pixel]);
+        /*
         uint32_t red1 = ((rgb >> 11) & 0x1F) << 3;
         uint32_t green1 = ((rgb >> 5) & 0x3F) << 2;
         uint32_t blue1 = (rgb & 0x1F) << 3;
         uint32_t gray = ((red1*54+green1*183+blue1*19) >> 8)&0xFF;
+        */
+        uint32_t gray = 0;
+        asm volatile ("l.nios_rrr %[out1],%[in1],r0,0xB":[out1]"=r"(gray)
+                                                        :[in1]"r"(rgb));
         grayscale[line*camParams.nrOfPixelsPerLine+pixel] = gray;
       }
     }
