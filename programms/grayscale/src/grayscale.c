@@ -7,6 +7,7 @@
 int main () {
   volatile uint16_t rgb565[640*480];
   volatile uint8_t grayscale[640*480];
+  volatile uint32_t* grayscale_ptr = NULL;
   volatile uint32_t result, cycles,stall,idle;
   volatile unsigned int *vga = (unsigned int *) 0X50000020;
   camParameters camParams;
@@ -45,10 +46,8 @@ int main () {
         asm volatile ("l.nios_rrr %[out1],%[in1],%[in2],0xD":[out1]"=r"(gray)
                                                             :[in1]"r"(valueA),
                                                              [in2]"r"(valueB));
-        grayscale[line*camParams.nrOfPixelsPerLine+pixel  ] =  gray >> 24;
-        grayscale[line*camParams.nrOfPixelsPerLine+pixel+1] = (gray >> 16) & 0xFF;
-        grayscale[line*camParams.nrOfPixelsPerLine+pixel+2] = (gray >>  8) & 0xFF;
-        grayscale[line*camParams.nrOfPixelsPerLine+pixel+3] =  gray        & 0xFF;
+        grayscale_ptr = (uint32_t*) &grayscale[line*camParams.nrOfPixelsPerLine+pixel];
+        *grayscale_ptr = gray;
       }
     }
     asm volatile ("l.nios_rrr %[out1],r0,%[in2],0xC":[out1]"=r"(cycles):[in2]"r"(1<<8|7<<4));
