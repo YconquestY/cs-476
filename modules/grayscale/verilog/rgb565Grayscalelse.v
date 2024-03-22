@@ -13,6 +13,6 @@ module rgb565Grayscalelse #(parameter [7:0] customInstructionId = 8'd0) (
     assign b = {valueA[ 4: 0], 3'd0};
 
     assign gray   = (8'd54 * r + 8'd183 * g + 8'd19 * b) >> 8;
-    assign result = (start && (iseld == customInstructionId)) ? gray[7:0] : 0;
+    assign result = (start && (iseld == customInstructionId)) ? {24'd0, gray[7:0]} : 0;
     assign done   = (start && (iseld == customInstructionId)) ? 1 : 0;
 endmodule
