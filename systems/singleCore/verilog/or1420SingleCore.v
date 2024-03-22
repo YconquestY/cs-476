@@ -453,15 +453,16 @@ module or1420SingleCore ( input wire         clock12MHz,
               .result(s_profileResult) );
   /*
    *
-   * A rgb565 to grayscale converter with custom instruction 0xB (11)
+   * An improved rgb565 to grayscale converter with custom instruction 0xD (13)
    *
    */
-  rgb565Grayscalelse #(.customInstructionId(8'd11)) grayscaleConverter
-                      (.start(s_cpu1CiStart),
-                       .valueA(s_cpu1CiDataA),
-                       .iseld(s_cpu1CiN),
-                       .done(s_grayscaleDone),
-                       .result(s_grayscaleResult));
+  rgb565Grayscalelse4 #(.customInstructionId(8'd13)) grayscaleConverter4
+                       (.start(s_cpu1CiStart),
+                        .valueA(s_cpu1CiDataA),
+                        .valueB(s_cpu1CiDataB),
+                        .iseld(s_cpu1CiN),
+                        .done(s_grayscaleDone),
+                        .result(s_grayscaleResult));
   /*
    *
    * Here we define the camera interface

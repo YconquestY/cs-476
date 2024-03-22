@@ -32,8 +32,11 @@ int main () {
     takeSingleImageBlocking((uint32_t) &rgb565[0]);
     asm volatile ("l.nios_rrr r0,r0,%[in2],0xC"::[in2]"r"(7)); // enable counters 0,1,2
     for (int line = 0; line < camParams.nrOfLinesPerImage; line++) {
-      for (int pixel = 0; pixel < camParams.nrOfPixelsPerLine; pixel++) {
-        uint16_t rgb = swap_u16(rgb565[line*camParams.nrOfPixelsPerLine+pixel]);
+      for (int pixel = 0; pixel < camParams.nrOfPixelsPerLine; pixel += 4) { // screen size 640 x 480: multiple of 4
+        uint16_t pA0 = swap_u16(rgb565[line*camParams.nrOfPixelsPerLine+pixel  ]);
+        uint16_t pA1 = swap_u16(rgb565[line*camParams.nrOfPixelsPerLine+pixel+1]);
+        uint16_t pB0 = swap_u16(rgb565[line*camParams.nrOfPixelsPerLine+pixel+2]);
+        uint16_t pB1 = swap_u16(rgb565[line*camParams.nrOfPixelsPerLine+pixel+3]);
         /*
         uint32_t red1 = ((rgb >> 11) & 0x1F) << 3;
         uint32_t green1 = ((rgb >> 5) & 0x3F) << 2;
@@ -41,9 +44,15 @@ int main () {
         uint32_t gray = ((red1*54+green1*183+blue1*19) >> 8)&0xFF;
         */
         uint32_t gray = 0;
-        asm volatile ("l.nios_rrr %[out1],%[in1],r0,0xB":[out1]"=r"(gray)
-                                                        :[in1]"r"(rgb));
-        grayscale[line*camParams.nrOfPixelsPerLine+pixel] = gray;
+        uint32_t valueA = ((uint32_t) pA0) << 16 | (uint32_t) pA1;
+        uint32_t valueB = ((uint32_t) pB0) << 16 | (uint32_t) pB1;
+        asm volatile ("l.nios_rrr %[out1],%[in1],%[in2],0xD":[out1]"=r"(gray)
+                                                            :[in1]"r"(valueA),
+                                                             [in2]"r"(valueB));
+        grayscale[line*camParams.nrOfPixelsPerLine+pixel  ] =  gray >> 24;
+        grayscale[line*camParams.nrOfPixelsPerLine+pixel+1] = (gray >> 16) & 0xFF;
+        grayscale[line*camParams.nrOfPixelsPerLine+pixel+2] = (gray >>  8) & 0xFF;
+        grayscale[line*camParams.nrOfPixelsPerLine+pixel+3] =  gray        & 0xFF;
       }
     }
     asm volatile ("l.nios_rrr %[out1],r0,%[in2],0xC":[out1]"=r"(cycles):[in2]"r"(1<<8|7<<4));
