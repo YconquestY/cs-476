@@ -1,4 +1,4 @@
-#### Structure:
+## Structure:
 
 The virtual prototype consists of three directories:
 
@@ -6,7 +6,7 @@ The virtual prototype consists of three directories:
 - programms: This directory contains the "hello world" template that can be used as basis for your own programms.
 - systems: This directory contains all the required files for the "top level" of the SOC.
 
-#### Hardware configuration files:
+## Hardware configuration files:
 
 To be able to build the Virtual Prototype hardware, there are several files:
 
@@ -17,7 +17,14 @@ To be able to build the Virtual Prototype hardware, there are several files:
 - systems/singleCore/config/project.qsf: This file is responsible to include the gecko4_or1420.tcl file. Do not modify this file.
 - systems/singleCore/config/project.toplevel: This file contains the name of the top-level module. Normally you should not have to modify this file.
 
-#### Building the hardware:
+### Custom instructions
+
+| ID (decimal) | Functionality|
+| ---          | ---          |
+| 11 | Convert a $16$-bit pixel in RGB565 format to an $8$-bit grayscale pixel |
+| 12 | Configure performance counters for profiling |
+
+## Building the hardware:
 
 As the tools are quite "heavy" and to provide a automated flow, a makefile system is used. To build the system:
 
@@ -25,7 +32,7 @@ As the tools are quite "heavy" and to provide a automated flow, a makefile syste
 - Type: ```make intel_bit```
 - If no errors occurred you'll find in the directory ```systems/singleCore/sandbox``` the files ```or1420SingleCore.cfg``` and ```or1420SingleCore.rbf```. These files can be used to program your FPGA with the open-source tool ```openocd``` of the oss-cad-suite by executing ```openocd -f or1420SingleCore.cfg``` on the machine to which the GECKO4Education board is connected. Alternatively you can use the intel quartus programmer, for this you require the file ```or1420SingleCore.sof```, which is also available in the directory ```systems/singleCore/sandbox```
 
-#### Building the software:
+## Building the software:
 
 Also the software is based on a makefile system. To build a program follow following steps (with as example the hello world program):
 
