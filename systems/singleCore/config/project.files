@@ -17,7 +17,8 @@
 ../../../modules/i2c/verilog/i2cCustomInstr.v
 ../../../modules/profileCi/verilog/counter.v
 ../../../modules/profileCi/verilog/profileCi.v
-../../../modules/grayscale/verilog/rgb565Grayscalelse.v
+../../../modules/grayscaleCi/verilog/rgb565Grayscale.v
+../../../modules/grayscaleCi/verilog/rgb565ISE.v
 ../../../modules/camera/verilog/camera.v
 ../../../modules/delay/verilog/delayIse.v
 ../../../modules/swapbyteIse/verilog/swapByteIse.v

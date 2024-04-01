@@ -21,7 +21,7 @@ To be able to build the Virtual Prototype hardware, there are several files:
 
 | ID (decimal) | Functionality|
 | ---          | ---          |
-| 11 | Convert a $16$-bit pixel in RGB565 format to an $8$-bit grayscale pixel |
+|  9 | Convert $4$ $16$-bit pixels in RGB565 format to $4$ $8$-bit grayscale pixels, stored collectively in a $32$-bit result |
 | 12 | Configure performance counters for profiling |
 
 ## Building the hardware:
