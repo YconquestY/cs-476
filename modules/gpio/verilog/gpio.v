@@ -1,6 +1,6 @@
 module gpio #(parameter        nrOfInputs = 8,
               parameter        nrOfOutputs = 8,
-              parameter [31:0] Base = 32'h40000000)
+              parameter [31:0] Base = 32'h40000000) // memory base address
             ( input wire                    clock,
                                             reset,
               input wire [nrOfInputs-1:0]   externalInputs,
@@ -27,7 +27,7 @@ module gpio #(parameter        nrOfInputs = 8,
    *
    */
   reg        s_transactionActiveReg, s_readNotWriteReg, s_beginTransactionReg;
-  reg [31:2] s_addressDataInReg;
+  reg [31:2] s_addressDataInReg; // 30b: word-alignment
   reg [3:0]  s_byteEnablesReg;
   reg [7:0]  s_burstSizeReg;
   
@@ -37,7 +37,7 @@ module gpio #(parameter        nrOfInputs = 8,
       s_transactionActiveReg <= (reset == 1'b1 || endTransactionIn == 1'b1) ? 1'b0 :
                                 (beginTransactionIn == 1'b1) ? 1'b1 : s_transactionActiveReg;
       s_readNotWriteReg      <= (beginTransactionIn == 1'b1) ? readNotWriteIn : s_readNotWriteReg;
-      s_addressDataInReg     <= (beginTransactionIn == 1'b1) ? addressDataIn[31:2] : s_addressDataInReg;
+      s_addressDataInReg     <= (beginTransactionIn == 1'b1) ? addressDataIn[31:2] : s_addressDataInReg; // 30b: word alignment
       s_byteEnablesReg       <= (beginTransactionIn == 1'b1) ? byteEnablesIn : s_byteEnablesReg;
       s_burstSizeReg         <= (beginTransactionIn == 1'b1) ? burstSizeIn : s_burstSizeReg;
     end
