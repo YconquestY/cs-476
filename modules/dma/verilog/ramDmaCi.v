@@ -6,7 +6,23 @@ module ramDmaCi #(parameter [7:0] customId = 8'h00)
                                      valueB, // data interface
                   input  wire [ 7:0] ciN,
                   output wire        done,
-                  output wire [31:0] result);
+                  output wire [31:0] result,
+                  // bus interface
+                  output wire        requestOut,
+                  input  wire        grantedIn,
+
+                  input  wire [31:0] addressDataIn,
+                  output wire [31:0] addressDataOut
+                  output wire [ 3:0] byteEnablesOut,
+                  output wire [ 7:0] burstSizeOut,
+                  output wire        readNotWrite,
+                  output wire        beginTransactionOut,
+                  input  wire        endTransactionIn,
+                  output wire        endTransactionOut,
+                  input  wire        dataValidIn,
+                  output wire        dataValidOut,
+                  input  wire        busyIn,
+                  input  wire        busErrorIn);
     reg  [31: 0] mem [511:0]; // 512 32b words, i.e., 2KB
 
     wire [ 8: 0] addr;
@@ -18,7 +34,7 @@ module ramDmaCi #(parameter [7:0] customId = 8'h00)
     // CPU-side port
     assign valid   = valueA[31:10] == 0;
 
-    always @ (posedge clock or posedge reset) begin
+    always @ (posedge clock) begin
         if (reset) begin
             done   <= 1'b0; // `=`?
             result <= 32'x;
@@ -33,7 +49,7 @@ module ramDmaCi #(parameter [7:0] customId = 8'h00)
                     result <= 32'0;
                 end
                 else begin // read
-                    result <= mem[addr];
+                    result <= mem[addr]; // 2-cycle read latency
                 end
                 done <= 1'b1;
             end
@@ -44,23 +60,49 @@ module ramDmaCi #(parameter [7:0] customId = 8'h00)
         end
     end
     // DMA-side port
-    wire [ 2:0] map;     // (essentially 3b) register map
-    reg  [31:0] bAddr;   // bus address
-    reg  [ 8:0] mAddr;   // SRAM address
-    reg  [ 9:0] blockS;  // block size
-    reg  [ 7:0] burstS;  // burst size
-    reg  [ 1:0] status;  // bit 0: busy? bit 1: error?
-    reg         control; // DMA control: 1 means from bus to SRAM
-
+    wire [ 2:0] map;    // register map
+    reg  [31:0] bAddr;  // bus address
+    reg  [ 8:0] mAddr;  // SRAM address
+    reg  [ 9:0] blockS; // block size
+    reg  [ 7:0] burstS; // burst size
+    /* read-only register (by CPU) indicating the status of data transfer
+     *
+     * This is an internal register that changes automatically according to
+     * data transfer progress.
+     *
+     * 00: idle
+     * 01: data transfer in progress
+     * 10: error
+     * 11: error
+     */
+    reg [1:0] status;  // bit 0: busy? bit 1: error?
+    /* write-only register (by CPU) instructing the DMA controller to do data
+     * transfer 
+     *
+     * 00: idle
+     * 01: from bus  to SRAM
+     * 10: from SRAM to bus
+     * 11: undefined
+     */
+    reg [1:0] control; 
+    
     assign map = valueA[12:10];
     
     always @ (negedge clock) begin // Is `reset` in the sensitivity list?
-        if (reset) begin // Can DMA controller reset SRAM?
+        if (reset) begin
             done   <= 1'b0; // `=`?
             result <= 32'x;
+            // duplicate reset?
             for (integer i = 0; i < 512; i = i + 1) begin
                 mem[i] <= 32'0;
             end
+            map     <=  3'0;
+            bAddr   <= 32'0;
+            mAddr   <=  9'0;
+            blockS  <= 10'0;
+            burstS  <=  8'0;
+            status  <=  2'0;
+            control <=  2'0;
         end
         else begin
             if (writeen) begin // write
@@ -81,7 +123,7 @@ module ramDmaCi #(parameter [7:0] customId = 8'h00)
                         burstS <= valueB[7:0];
                     end
                     3'b101: begin // write control register
-                        control <= 1 // Why 1?
+                        control <= valueB[1:0]; // see https://edstem.org/eu/courses/1113/discussion/104725?answer=198693
                     end
                     default: begin
                         // do nothing
@@ -91,7 +133,7 @@ module ramDmaCi #(parameter [7:0] customId = 8'h00)
                 endcase
             end
             else begin // read
-                case (control)
+                case (map)
                     3'b000: begin // read from SRAM
                         result <= mem[addr];
                     end
@@ -118,4 +160,51 @@ module ramDmaCi #(parameter [7:0] customId = 8'h00)
             end
         end
     end
+    // request bus access
+    reg requestReg;
+    reg beginTransactionReg; // not an output signal
+    always @ (negedge clock) begin
+        if (control[1] ^ control[0]) begin // TRUE for 01 and 10
+            requestReg <= 1'b1;
+        end
+    end
+
+    always @ (negedge clock) begin
+        if ((control[1] ^ control[0]) || requestReg) begin
+            if (grantedIn) begin
+                status <= 2'b01;
+                requestOut <= 1'b0; // access granted, finish request
+                requestReg <= 1'b0;
+                beginTransactionReg <= 1'b1;
+            end
+            else begin
+                // `status` remains unchanged.
+                requestOut <= 1'b1; // keep requesting until access granted
+            end
+        end
+    end
+    // flip-flop bus signals
+    // `grantedIn` not flip-flopped
+    reg [31:2] s_addressDataReg; // "copy" of `addressDataIn`; 30b: word alignment
+    reg        s_endTransactionReg;
+    reg        s_dataValidReg; // "copy" of `dataValidIn`
+    // `busyIn`     not flip-flopped
+    // `busErrorIn` not flip-flopped
+    always @ (negedge clock) begin
+        s_addressDataReg    <= (beginTransactionReg == 1'b1) ? addressDataIn[31:2]
+                                                             : s_addressDataReg;
+        s_endTransactionReg <= (beginTransactionReg == 1'b1) ? endTransactionIn
+                                                             : s_endTransactionIn;
+        s_dataValidReg      <= (beginTransactionReg == 1'b1) ? dataValidIn
+                                                             : s_dataValidReg;
+        beginTransactionReg <= (beginTransactionReg == 1'b1) ? 1'b0 // pulse
+                                                             : beginTransactionReg;
+    end
+    // error handling
+    always @ (negedge clock) begin
+        // TODO: `endTransactionOut`, `status`, and bus-related FFs````
+    end
+
+    // TODO: what if `control` is reset as idle when data transfer is in progress?
+    // TODO: reset `status` upon transaction completion or error
 endmodule

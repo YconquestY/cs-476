@@ -670,13 +670,15 @@ module or1420SingleCore ( input wire         clock12MHz,
  assign s_busRequests[31] = s_cpu1DcacheRequestBus;
  assign s_busRequests[30] = s_cpu1IcacheRequestBus;
  assign s_busRequests[29] = s_hdmiRequestBus;
- assign s_busRequests[28] =  s_camReqBus;
- assign s_busRequests[27:0] = 29'd0;
+ assign s_busRequests[28] = s_camReqBus;
+ assign s_busRequests[27] = s_dmaRequestBus;
+ assign s_busRequests[26:0] = 27'd0;
  
  assign s_cpu1DcacheBusAccessGranted = s_busGrants[31];
  assign s_cpu1IcacheBusAccessGranted = s_busGrants[30];
  assign s_hdmiBusgranted             = s_busGrants[29];
  assign s_camAckBus                  = s_busGrants[28];
+ assign s_dmaBusAccessGranted        = s_busGrants[27];
 
  busArbiter arbiter ( .clock(s_systemClock),
                       .reset(s_reset),
@@ -692,6 +694,12 @@ module or1420SingleCore ( input wire         clock12MHz,
                       .addressDataIn(s_addressData[31:30]),
                       .burstSizeIn(s_burstSize));
  
+  /*
+   *
+   * Here we define the DMA controller
+   *
+   */
+  wire s_dmaRequestBus, s_dmaBusAccessGranted;
   /*
    *
    * Here we define the bus architecture
