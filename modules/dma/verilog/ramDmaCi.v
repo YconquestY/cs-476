@@ -8,21 +8,23 @@ module ramDmaCi #(parameter [7:0] customId = 8'h00)
                   output wire        done,
                   output wire [31:0] result,
                   // bus interface
-                  output wire        requestOut,
                   input  wire        grantedIn,
 
                   input  wire [31:0] addressDataIn,
+                  input  wire        endTransactionIn,
+                  input  wire        dataValidIn,
+                  input  wire        busErrorIn,
+                  input  wire        busyIn
+
+                  output wire        requestOut,
+
                   output wire [31:0] addressDataOut
                   output wire [ 3:0] byteEnablesOut,
                   output wire [ 7:0] burstSizeOut,
-                  output wire        readNotWrite,
+                  output wire        readNotWriteOut,
                   output wire        beginTransactionOut,
-                  input  wire        endTransactionIn,
                   output wire        endTransactionOut,
-                  input  wire        dataValidIn,
-                  output wire        dataValidOut,
-                  input  wire        busyIn,
-                  input  wire        busErrorIn);
+                  output wire        dataValidOut);
     reg  [31: 0] mem [511:0]; // 512 32b words, i.e., 2KB
 
     wire [ 8: 0] addr;
@@ -160,51 +162,5 @@ module ramDmaCi #(parameter [7:0] customId = 8'h00)
             end
         end
     end
-    // request bus access
-    reg requestReg;
-    reg beginTransactionReg; // not an output signal
-    always @ (negedge clock) begin
-        if (control[1] ^ control[0]) begin // TRUE for 01 and 10
-            requestReg <= 1'b1;
-        end
-    end
-
-    always @ (negedge clock) begin
-        if ((control[1] ^ control[0]) || requestReg) begin
-            if (grantedIn) begin
-                status <= 2'b01;
-                requestOut <= 1'b0; // access granted, finish request
-                requestReg <= 1'b0;
-                beginTransactionReg <= 1'b1;
-            end
-            else begin
-                // `status` remains unchanged.
-                requestOut <= 1'b1; // keep requesting until access granted
-            end
-        end
-    end
-    // flip-flop bus signals
-    // `grantedIn` not flip-flopped
-    reg [31:2] s_addressDataReg; // "copy" of `addressDataIn`; 30b: word alignment
-    reg        s_endTransactionReg;
-    reg        s_dataValidReg; // "copy" of `dataValidIn`
-    // `busyIn`     not flip-flopped
-    // `busErrorIn` not flip-flopped
-    always @ (negedge clock) begin
-        s_addressDataReg    <= (beginTransactionReg == 1'b1) ? addressDataIn[31:2]
-                                                             : s_addressDataReg;
-        s_endTransactionReg <= (beginTransactionReg == 1'b1) ? endTransactionIn
-                                                             : s_endTransactionIn;
-        s_dataValidReg      <= (beginTransactionReg == 1'b1) ? dataValidIn
-                                                             : s_dataValidReg;
-        beginTransactionReg <= (beginTransactionReg == 1'b1) ? 1'b0 // pulse
-                                                             : beginTransactionReg;
-    end
-    // error handling
-    always @ (negedge clock) begin
-        // TODO: `endTransactionOut`, `status`, and bus-related FFs````
-    end
-
-    // TODO: what if `control` is reset as idle when data transfer is in progress?
-    // TODO: reset `status` upon transaction completion or error
+    // TODO: DMA controller state machine
 endmodule
