@@ -9,22 +9,20 @@ module ramDmaCi #(parameter [7:0] customId = 8'h00)
                   output wire [31:0] result,
                   // bus interface
                   input  wire        grantedIn,
-
                   input  wire [31:0] addressDataIn,
                   input  wire        endTransactionIn,
-                  input  wire        dataValidIn,
-                  input  wire        busErrorIn,
-                  input  wire        busyIn
-
+                                     dataValidIn,
+                                     busErrorIn,
+                                     busyIn,
+                  
                   output wire        requestOut,
-
                   output wire [31:0] addressDataOut
                   output wire [ 3:0] byteEnablesOut,
                   output wire [ 7:0] burstSizeOut,
                   output wire        readNotWriteOut,
-                  output wire        beginTransactionOut,
-                  output wire        endTransactionOut,
-                  output wire        dataValidOut);
+                                     beginTransactionOut,
+                                     endTransactionOut,
+                                     dataValidOut);
     reg  [31: 0] mem [511:0]; // 512 32b words, i.e., 2KB
 
     wire [ 8: 0] addr;
@@ -162,5 +160,13 @@ module ramDmaCi #(parameter [7:0] customId = 8'h00)
             end
         end
     end
-    // TODO: DMA controller state machine
+    
+    localparam idle       = 3'd0,
+               request    = 3'd1,
+               granted    = 3'd2,
+               read       = 3'd3,
+               rdComplete = 3'd4,
+               write      = 3'd5,
+               wrComplete = 3'd6,
+               error      = 3'd7;
 endmodule
