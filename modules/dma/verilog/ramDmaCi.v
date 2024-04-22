@@ -61,8 +61,8 @@ module ramDmaCi #(parameter [7:0] customId = 8'h00)
     end
     // DMA-side port
     wire [ 2:0] map;    // register map
-    reg  [31:0] bAddr;  // bus address
-    reg  [ 8:0] mAddr;  // SRAM address
+    reg  [31:0] bAddr;  // bus address; increment by 4
+    reg  [ 8:0] mAddr;  // SRAM address; increment by 1
     reg  [ 9:0] blockS; // block size
     reg  [ 7:0] burstS; // burst size
     /* read-only register (by CPU) indicating the status of data transfer
@@ -169,4 +169,246 @@ module ramDmaCi #(parameter [7:0] customId = 8'h00)
                write      = 3'd5,
                wrComplete = 3'd6,
                error      = 3'd7;
+    reg [2:0] current, // state
+              next;
+    reg [7:0] txProgress;      // single transaction progress (descending)
+    reg [9:0] dataProgress;    // aggregate transfer progress (ascending)
+    reg       readNotWriteReg; // data transfer direction
+
+    // state transition
+    always @ (negedge clock) begin
+        if (reset) begin
+            current <= idle;
+
+            txProgress   <=  8'd0;
+            dataProgress <= 10'd0;
+        end
+        else begin
+            current <= next;
+        end
+    end
+    // helper function to computing number of words to be transferred
+    function [9:0] remaining;
+    input [9:0] blockS,
+                dataProgress;
+    begin
+        remaining = blockS - dataProgress;
+    end
+    endfunction
+    // next state logic
+    always @ (*) begin
+        next = current; // default case
+        case (current)
+            idle: begin
+                if (blockS > 0 && (control[1] ^ control[0])) begin // `burstS` is always positive.
+                    next = request;
+                    readNotWriteReg = control == 2'b01; // only set, never reset
+                end
+                /*
+                else
+                    next = idle;
+                */
+                dataProgress = 0;
+            end
+            request: begin
+                if (busErrorIn)
+                    next = error;
+                else if (grantedIn)
+                    next = granted;
+                /*
+                else
+                    next = request;
+                */
+            end
+            granted: begin
+                if (busErrorIn)
+                    next = error;
+                else begin
+                    if (readNotWriteReg) // read from bus
+                        next = read;
+                    else // write to bus
+                        next = write;
+
+                    if (remaining(blockS, dataProgress) > burstS + 1)
+                        txProgress = burstS;
+                    else
+                        txProgress = remaining(blockS, dataProgress);
+                    // `dataProgress` reset in `idle` state
+                end
+            end
+            read: begin
+                if (busErrorIn)
+                    next = error;
+                else begin
+                    /*
+                    if (txProgress > 0)
+                        next = read;
+                    else*/ if (txProgress == 0) begin
+                        if (endTransactionIn && !busyIn)
+                            next = rdComplete;
+                        /*
+                        else if (dataValidIn && !busyIn)
+                            next = read;
+                        */
+                        else
+                            next = read;
+                    end
+
+                    if (dataValidIn && !busyIn) begin
+                        mem[mAddr] = addressDataIn;
+
+                        bAddr = bAddr + 4;
+                        mAddr = mAddr + 1;
+
+                        if (txProgress > 0)
+                            txProgress = txProgress - 1;
+                        dataProgress = dataProgress + 1;
+                    end
+                end
+            end
+            rdComplete: begin
+                if (dataProgress == blockS)
+                    next = idle;
+                else
+                    next = request;
+            end
+            write: begin
+                if (busErrorIn)
+                    next = error;
+                else begin
+                    /*
+                    if (txProgress > 0)
+                        next = write;
+                    else*/ if (txProgress == 0)begin
+                        if (!busyIn)
+                            next = wrComplete;
+                        else
+                            next = write;
+                    end
+
+                    if (!busyIn) begin                        
+                        bAddr = bAddr + 4;
+                        mAddr = mAddr + 1;
+
+                        if (txProgress > 0)
+                            txProgress = txProgress - 1;
+                        dataProgress = dataProgress + 1;
+                    end
+                end
+            end
+            wrComplete: begin
+                if (dataProgress == blockS)
+                    next = idle;
+                else 
+                    next = request;
+            end
+            error: begin
+                if (!busErrorIn)
+                    next = idle;
+                
+                txProgress = 0;
+            end
+            default: begin
+                next = idle;
+            end
+        endcase
+    end
+    // output logic
+    always @ (*) begin
+        case (current)
+            idle: begin
+                requestOut          =  1'b0;
+                addressDataOut      = 32'd0;
+                byteEnablesOut      =  4'd0;
+                burstSizeOut        =  8'd0;
+                readNotWriteOut     =  1'b0;
+                beginTransactionOut =  1'b0;
+                endTransactionOut   =  1'b0;
+                dataValidOut        =  1'b0;
+            end
+            request: begin
+                requestOut          =  1'b1;
+                addressDataOut      = 32'd0;
+                byteEnablesOut      =  4'd0;
+                burstSizeOut        =  8'd0;
+                readNotWriteOut     =  1'b0;
+                beginTransactionOut =  1'b0;
+                endTransactionOut   =  1'b0;
+                dataValidOut        =  1'b0;
+            end
+            granted: begin
+                requestOut          = 1'b0;
+                addressDataOut      = bAddr;
+                byteEnablesOut      = readNotWriteReg ? 4'h0 : 4'hF;
+                if (remaining(blockS, dataProgress) > burstS + 1)
+                    burstSizeOut = burstS;
+                else
+                    burstSizeOut = remaining(blockS, dataProgress);
+                readNotWriteOut     = readNotWriteReg;
+                beginTransactionOut = 1'b1;
+                endTransactionOut   = 1'b0;
+                dataValidOut        = 1'b0;
+            end
+            read: begin
+                requestOut          =  1'b0;
+                addressDataOut      = 32'd0;
+                byteEnablesOut      =  4'd0;
+                burstSizeOut        =  8'd0;
+                readNotWriteOut     =  1'b0;
+                beginTransactionOut =  1'b0;
+                endTransactionOut   =  1'b0;
+                dataValidOut        =  1'b0;
+            end
+            rdComplete: begin
+                requestOut          =  1'b0;
+                addressDataOut      = 32'd0;
+                byteEnablesOut      =  4'd0;
+                burstSizeOut        =  8'd0;
+                readNotWriteOut     =  1'b0;
+                beginTransactionOut =  1'b0;
+                endTransactionOut   =  1'b0;
+                dataValidOut        =  1'b0;
+            end
+            write: begin
+                requestOut          = 1'b0;
+                addressDataOut      = mem[mAddr];
+                byteEnablesOut      = 4'd0;
+                burstSizeOut        = 8'd0;
+                readNotWriteOut     = 1'b0;
+                beginTransactionOut = 1'b0;
+                endTransactionOut   = 1'b0;
+                dataValidOut        = 1'b1; // TODO: SRAM latency?
+            end
+            wrComplete: begin
+                requestOut          =  1'b0;
+                addressDataOut      = 32'd0;
+                byteEnablesOut      =  4'd0;
+                burstSizeOut        =  8'd0;
+                readNotWriteOut     =  1'b0;
+                beginTransactionOut =  1'b0;
+                endTransactionOut   =  1'b1;
+                dataValidOut        =  1'b0;
+            end
+            error: begin
+                requestOut          =  1'b0;
+                addressDataOut      = 32'd0;
+                byteEnablesOut      =  4'd0;
+                burstSizeOut        =  8'd0;
+                readNotWriteOut     =  1'b0;
+                beginTransactionOut =  1'b0;
+                endTransactionOut   =  1'b1;
+                dataValidOut        =  1'b0;
+            end
+            default: begin
+                requestOut          =  1'b0;
+                addressDataOut      = 32'd0;
+                byteEnablesOut      =  4'd0;
+                burstSizeOut        =  8'd0;
+                readNotWriteOut     =  1'b0;
+                beginTransactionOut =  1'b0;
+                endTransactionOut   =  1'b0;
+                dataValidOut        =  1'b0;
+            end
+        endcase
+    end
 endmodule
