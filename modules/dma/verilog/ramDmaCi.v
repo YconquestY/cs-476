@@ -5,8 +5,8 @@ module ramDmaCi #(parameter [7:0] customId = 8'h00)
                   input  wire [31:0] valueA, // address
                                      valueB, // data interface
                   input  wire [ 7:0] ciN,
-                  output wire        done,
-                  output wire [31:0] result,
+                  output reg         done,
+                  output reg  [31:0] result,
                   // bus interface
                   input  wire        grantedIn,
                   input  wire [31:0] addressDataIn,
@@ -15,14 +15,14 @@ module ramDmaCi #(parameter [7:0] customId = 8'h00)
                                      busErrorIn,
                                      busyIn,
                   
-                  output wire        requestOut,
-                  output wire [31:0] addressDataOut
-                  output wire [ 3:0] byteEnablesOut,
-                  output wire [ 7:0] burstSizeOut,
-                  output wire        readNotWriteOut,
-                                     beginTransactionOut,
-                                     endTransactionOut,
-                                     dataValidOut);
+                  output reg        requestOut,
+                  output reg [31:0] addressDataOut,
+                  output reg [ 3:0] byteEnablesOut,
+                  output reg [ 7:0] burstSizeOut,
+                  output reg        readNotWriteOut,
+                                    beginTransactionOut,
+                                    endTransactionOut,
+                                    dataValidOut);
     reg  [31: 0] mem [511:0]; // 512 32b words, i.e., 2KB
 
     wire [ 8: 0] addr;
@@ -36,17 +36,17 @@ module ramDmaCi #(parameter [7:0] customId = 8'h00)
 
     always @ (posedge clock) begin
         if (reset) begin
-            done   <= 1'b0; // `=`?
-            result <= 32'x;
+            done   <=  1'b0;
+            result <= 32'd0;
             for (integer i = 0; i < 512; i = i + 1) begin
-                mem[i] <= 32'0;
+                mem[i] <= 32'd0;
             end
         end
         else begin
             if (start && valid && (ciN == customId)) begin
                 if (writeen) begin // write
                     mem[addr] <= valueB;
-                    result <= 32'0;
+                    result <= 32'd0;
                 end
                 else begin // read
                     result <= mem[addr]; // 2-cycle read latency
@@ -54,8 +54,8 @@ module ramDmaCi #(parameter [7:0] customId = 8'h00)
                 done <= 1'b1;
             end
             else begin
-                done   <= 1'b0;
-                result <= 32'x;
+                done   <=  1'b0;
+                result <= 32'd0;
             end
         end
     end
@@ -90,19 +90,18 @@ module ramDmaCi #(parameter [7:0] customId = 8'h00)
     
     always @ (negedge clock) begin // Is `reset` in the sensitivity list?
         if (reset) begin
-            done   <= 1'b0; // `=`?
-            result <= 32'x;
+            done   <=  1'b0; // `=`?
+            result <= 32'd0;
             // duplicate reset?
             for (integer i = 0; i < 512; i = i + 1) begin
-                mem[i] <= 32'0;
+                mem[i] <= 32'd0;
             end
-            map     <=  3'0;
-            bAddr   <= 32'0;
-            mAddr   <=  9'0;
-            blockS  <= 10'0;
-            burstS  <=  8'0;
-            status  <=  2'0;
-            control <=  2'0;
+            bAddr   <= 32'd0;
+            mAddr   <=  9'd0;
+            blockS  <= 10'd0;
+            burstS  <=  8'd0;
+            status  <=  2'd0;
+            control <=  2'd0;
         end
         else begin
             if (writeen) begin // write
@@ -128,9 +127,9 @@ module ramDmaCi #(parameter [7:0] customId = 8'h00)
                     default: begin
                         // do nothing
                     end
-                    done   <= 1'b1;
-                    result <= 32'0;
                 endcase
+                done   <=  1'b1;
+                result <= 32'd0;
             end
             else begin // read
                 case (map)
@@ -141,22 +140,22 @@ module ramDmaCi #(parameter [7:0] customId = 8'h00)
                         result <= bAddr;
                     end
                     3'b010: begin // read SRAM start address
-                        result <= {23'0, mAddr};
+                        result <= {23'd0, mAddr};
                     end
                     3'b011: begin // read block size
-                        result <= {22'0, blockS};
+                        result <= {22'd0, blockS};
                     end
                     3'b100: begin // read burst size
-                        result <= {24'0, burstS};
+                        result <= {24'd0, burstS};
                     end
                     3'b101: begin // read status register
-                        result <= {30'0, status};
+                        result <= {30'd0, status};
                     end
                     default: begin
                         // do nothing
                     end
-                    done <= 1'b1;
                 endcase
+                done <= 1'b1;
             end
         end
     end
