@@ -5,7 +5,7 @@ module ramDmaCi #(parameter [7:0] customId = 8'h00)
                   input  wire [31:0] valueA, // address
                                      valueB, // data interface
                   input  wire [ 7:0] ciN,
-                  output reg         done,
+                  output wire        done,
                   output reg  [31:0] result,
                   // bus interface
                   input  wire        grantedIn,
@@ -28,38 +28,43 @@ module ramDmaCi #(parameter [7:0] customId = 8'h00)
     wire [ 8: 0] addr;
     wire         writeen;
     wire [31:10] valid;
+    reg          rdDone;
 
     assign addr    = valueA[8:0];
     assign writeen = valueA[9];
     // CPU-side port
-    assign valid   = valueA[31:10] == 0;
+    wire port1WrDone;
+
+    assign valid = valueA[31:10] == 0;
+    assign port1WrDone = !reset && start && valid && (ciN == customId) && writeen;
 
     always @ (posedge clock) begin
         if (reset) begin
-            done   <=  1'b0;
+            rdDone <= 1'b0;
             result <= 32'd0;
             for (integer i = 0; i < 512; i = i + 1) begin
                 mem[i] <= 32'd0;
             end
         end
-        else begin
-            if (start && valid && (ciN == customId)) begin
-                if (writeen) begin // write
-                    mem[addr] <= valueB;
-                    result <= 32'd0;
-                end
-                else begin // read
-                    result <= mem[addr]; // 2-cycle read latency
-                end
-                done <= 1'b1;
-            end
-            else begin
-                done   <=  1'b0;
+        else if (start && valid && (ciN == customId)) begin
+            if (writeen) begin // write
+                mem[addr] <= valueB;
+
+                rdDone <= 1'b0;
                 result <= 32'd0;
             end
+            else begin // read
+                result <= mem[addr]; // 2-cycle read latency
+                rdDone <= 1'b1;
+            end
+        end
+        else begin
+            rdDone <= 1'b0;
+            result <= 32'd0;
         end
     end
     // DMA-side port
+    wire        port2WrDone;
     wire [ 2:0] map;    // register map
     reg  [31:0] bAddr;  // bus address; increment by 4
     reg  [ 8:0] mAddr;  // SRAM address; increment by 1
@@ -87,10 +92,11 @@ module ramDmaCi #(parameter [7:0] customId = 8'h00)
     reg [1:0] control; 
     
     assign map = valueA[12:10];
+    assign port2WrDone = !reset && start && (ciN == customId) && writeen;
     
     always @ (negedge clock) begin // Is `reset` in the sensitivity list?
         if (reset) begin
-            done   <=  1'b0; // `=`?
+            rdDone <= 1'b0;
             result <= 32'd0;
             // duplicate reset?
             for (integer i = 0; i < 512; i = i + 1) begin
@@ -103,7 +109,7 @@ module ramDmaCi #(parameter [7:0] customId = 8'h00)
             status  <=  2'd0;
             control <=  2'd0;
         end
-        else begin
+        else if (start && (ciN == customId)) begin
             if (writeen) begin // write
                 case (map)
                     3'b000: begin // write to SRAM
@@ -128,7 +134,7 @@ module ramDmaCi #(parameter [7:0] customId = 8'h00)
                         // do nothing
                     end
                 endcase
-                done   <=  1'b1;
+                rdDone <= 1'b0;
                 result <= 32'd0;
             end
             else begin // read
@@ -155,10 +161,16 @@ module ramDmaCi #(parameter [7:0] customId = 8'h00)
                         // do nothing
                     end
                 endcase
-                done <= 1'b1;
+                rdDone <= 1'b1;
             end
         end
+        else begin
+            rdDone <= 1'b0;
+            result <= 32'd0;
+        end
     end
+
+    assign done = rdDone || port1WrDone || port2WrDone;
     
     localparam idle       = 3'd0,
                request    = 3'd1,
