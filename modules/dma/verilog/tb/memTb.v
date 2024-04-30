@@ -1,3 +1,6 @@
+`include "../ramDmaCi.v"
+
+
 `timescale 1ps/1ps
 
 module memTb;
@@ -53,22 +56,12 @@ module memTb;
         ciN    <= 8'd0;
         valueA <= 32'd0;
         valueB <= 0;
+
+        _valueA <= 32'h000003FF;
+        _valueB <= 476;
         #20;
         // write to SRAM
-        _valueA <= 32'h000003FE;
-        _valueB <= 477;
-
-        start  <= 1'b1;
-        ciN    <= 8'd123;
-        valueA <= 32'h000003FF;
-        valueB <= 476;
-        #5;
-        start  <= 1'b0;
-        ciN    <= 8'd0;
-        valueA <= 0;
-        valueB <= 0;
-        #5;
-        repeat(4) begin
+        repeat(5) begin
             _valueA <= _valueA - 1;
             _valueB <= _valueB + 1;
 
@@ -76,13 +69,11 @@ module memTb;
             ciN    <= 8'd123;
             valueA <= _valueA;
             valueB <= _valueB;
-            #5;
-            start  <= 1'b0;
-            ciN    <= 8'd0;
-            valueA <= 0;
-            valueB <= 0;
-            #5;
+            #10;
         end
+
+        _valueA <= (_valueA & ~32'h00000200) + 1;
+        _valueB <= 0;
 
         start  <= 1'b0;
         ciN    <= 8'd0;
@@ -91,17 +82,13 @@ module memTb;
         #20;
         // read from SRAM
         repeat(5) begin
+            _valueA <= _valueA + 1;
+
             start  <= 1'b1;
             ciN    <= 8'd123;
             valueA <= _valueA;
             valueB <= 0;
-            #5;
-            start  <= 1'b0;
-            ciN    <= 8'd0;
-            valueA <= 0;
-            valueB <= 0;
-            #5;
-            valueA <= valueA + 1;
+            #10;
         end
 
         start  <= 1'b0;
