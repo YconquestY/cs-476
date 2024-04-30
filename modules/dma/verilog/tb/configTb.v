@@ -1,3 +1,6 @@
+`include "../ramDmaCi.v"
+
+
 `timescale 1ps/1ps
 
 module configTb;
@@ -78,7 +81,7 @@ module configTb;
         // read `mem[511]`
         valueA <= 32'h000001FF;
         valueB <= 0;
-        #10;
+        #20;
         // read bus start address
         valueA <= 32'h00000400;
         #10;

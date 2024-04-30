@@ -24,111 +24,79 @@ module ramDmaCi #(parameter [7:0] customId = 8'h00)
                                     endTransactionOut,
                                     dataValidOut);
     wire [8:0] addr;
-    wire       writeen;
-    wire       valid;
+    wire       writeen,
+               valid,
+               increment;
 
-    assign addr    = valueA[8:0];
-    assign writeen = valueA[9];
+    assign addr      = valueA[8:0];
+    assign writeen   = valueA[9];
+    assign increment = !busErrorIn && !busyIn && memTraffic;
     // bus address: increment by 4
-    reg         bAddrP0WriteEnable,
-                bAddrP1WriteEnable;
-    reg  [31:0] bAddrP0DataIn,
-                bAddrP1DataIn;
     wire [31:0] bAddrDataOut;
     cReg #(.width(8'd32)) bAddr
           (.clock(clock),
            .reset(reset),
-           
-           .p0WriteEnable(bAddrP0WriteEnable),
-           .p0DataIn(bAddrP0DataIn),
-           
-           .p1WriteEnable(bAddrP1WriteEnable),
-           .p1DataIn(bAddrP1DataIn),
+           // port 0 connected to CPU
+           .p0WriteEnable(port2WrDone && map == 3'b001),
+           .p0DataIn(valueB),
+           // port 1 connected to DMA FSM
+           .p1WriteEnable(increment),
+           .p1DataIn(bAddrDataOut + 32'd4),
            
            .dataOut(bAddrDataOut));
+    
     // memory address: increment by 1
-    reg        mAddrP0WriteEnable,
-               mAddrP1WriteEnable;
-    reg  [8:0] mAddrP0DataIn,
-               mAddrP1DataIn;
     wire [8:0] mAddrDataOut;
     cReg #(.width(8'd9)) mAddr
           (.clock(clock),
            .reset(reset),
-           
-           .p0WriteEnable(mAddrP0WriteEnable),
-           .p0DataIn(mAddrP0DataIn),
-           
-           .p1WriteEnable(mAddrP1WriteEnable),
-           .p1DataIn(mAddrP1DataIn),
+           // port 0 connected to CPU
+           .p0WriteEnable(port2WrDone && (map == 3'b010)),
+           .p0DataIn(valueB[8:0]),
+           // port 1 connected to DMA FSM
+           .p1WriteEnable(increment),
+           .p1DataIn(mAddrDataOut + 9'd1),
            
            .dataOut(mAddrDataOut));
-    // SRMA of 512 32b words, i.e., 2KB
-    reg         memP0WriteEnable,
-                memP1WriteEnable;
-    reg  [ 8:0] memP0AddressIn,
-                memP1AddressIn;
-    reg  [31:0] memP0DataIn,
-                memP1DataIn;
+    // SRAM of 512 32b words, i.e., 2KB
     wire [31:0] memP0DataOut,
                 memP1DataOut;
     cMem #(.width( 8'd32),
            .depth(12'd512)) mem
           (.clock(clock),
            .reset(reset),
-           
-           .p0WriteEnable(memP0WriteEnable),
-           .p0AddressIn(memP0AddressIn),
-           .p0DataIn(memP0DataIn),
-           
-           .p1WriteEnable(memP1WriteEnable),
-           .p1AddressIn(memP1AddressIn),
-           .p1DataIn(memP1DataIn),
+           // port 0 connected to DMA controller
+           .p0WriteEnable(memTraffic && !busErrorIn && dataValidIn && !busyIn),
+           .p0AddressIn(memTraffic ? mAddrDataOut : addr),
+           .p0DataIn(addressDataIn),
+           // port 1 connected to CPU
+           .p1WriteEnable(port1WrDone),
+           .p1AddressIn(addr),
+           .p1DataIn(valueB),
            
            .p0DataOut(memP0DataOut),
            .p1DataOut(memP1DataOut));
     // CPU-side port
     reg         port1RdDone;
     wire        port1WrDone;
-    reg  [31:0] port1Result;
 
     assign valid = valueA[31:10] == 0;
     assign port1WrDone = !reset && start && valid && (ciN == customId) && writeen;
 
     always @ (posedge clock) begin
         if (reset) begin
-            memP1WriteEnable <=  1'b0;
-            memP1AddressIn   <=  9'd0;
-            memP1DataIn      <= 32'd0;
-
             port1RdDone <= 1'b0;
-            port1Result <= 32'd0;
         end
         else if (start && valid && (ciN == customId)) begin
             if (writeen) begin // write
-                memP1WriteEnable <= 1'b1;
-                memP1AddressIn   <= addr;
-                memP1DataIn      <= valueB;
-
                 port1RdDone <= 1'b0;
-                port1Result <= 32'd0;
             end
-            else begin // read
-                memP1WriteEnable <= 1'b0;
-                memP1AddressIn   <= addr;
-                memP1DataIn      <= 32'd0;
-
+            else begin // read: 2-cycle latency
                 port1RdDone <= 1'b1;
-                port1Result <= memP1DataOut; // 2-cycle read latency
             end
         end
         else begin
-            memP1WriteEnable <=  1'b0;
-            memP1AddressIn   <=  9'd0;
-            memP1DataIn      <= 32'd0;
-
             port1RdDone <=  1'b0;
-            port1Result <= 32'd0;
         end
     end
     // DMA-side port
@@ -160,22 +128,10 @@ module ramDmaCi #(parameter [7:0] customId = 8'h00)
     reg [1:0] control; 
     
     assign map = valueA[12:10];
-    assign port2WrDone = !reset && start && (ciN == customId) && writeen && !bAddrP1WriteEnable
-                                                                         && !mAddrP1WriteEnable;
+    assign port2WrDone = !reset && start && (ciN == customId) && writeen && !increment;
     always @ (negedge clock) begin
         if (reset) begin
-            bAddrP0WriteEnable <= 1'b0;
-            mAddrP0WriteEnable <= 1'b0;
-
-            bAddrP0DataIn <= 32'd0;
-            mAddrP0DataIn <=  9'd0;
-
-            memP0WriteEnable <=  1'b0;
-            memP0AddressIn   <=  9'd0;
-            memP0DataIn      <= 32'd0;
-
             port2RdDone <= 1'b0;
-            port2Result <= 32'd0;
             
             blockS  <= 10'd0;
             burstS  <=  8'd0;
@@ -185,17 +141,6 @@ module ramDmaCi #(parameter [7:0] customId = 8'h00)
         else if (start && (ciN == customId)) begin
             if (writeen) begin // write
                 case (map)
-                    3'b000: begin // write to SRAM
-                        // write already done upone rising edge
-                    end
-                    3'b001: begin // write bus start address
-                        bAddrP0WriteEnable <= 1'b1;
-                        bAddrP0DataIn      <= valueB;
-                    end
-                    3'b010: begin // write SRAM start address
-                        mAddrP0WriteEnable <= 1'b1;
-                        mAddrP0DataIn      <= valueB[8:0];
-                    end
                     3'b011: begin // write block size
                         blockS <= valueB[9:0];
                     end
@@ -206,65 +151,56 @@ module ramDmaCi #(parameter [7:0] customId = 8'h00)
                         control <= valueB[1:0]; // see https://edstem.org/eu/courses/1113/discussion/104725?answer=198693
                     end
                     default: begin
-                        // do nothing
+                        /* do nothing
+                         *
+                         * 3'b000: write already done upon rising edge
+                         * 3'b001: bus address implicitly written
+                         * 3'b010: SRAM address implicitly written
+                         */
                     end
                 endcase
                 port2RdDone <= 1'b0;
-                port2Result <= 32'd0;
             end
             else begin // read
-                case (map)
-                    3'b000: begin // read from SRAM
-                        memP0WriteEnable <= 1'b0;
-                        memP0AddressIn   <= addr;
-                        memP0DataIn      <= 32'd0;
-
-                        port2Result <= memP0DataOut;
-                    end
-                    3'b001: begin // read bus start address
-                        bAddrP0WriteEnable <=  1'b0;
-                        bAddrP0DataIn      <= 32'd0;
-
-                        port2Result <= bAddrDataOut;
-                    end
-                    3'b010: begin // read SRAM start address
-                        mAddrP0WriteEnable <=  1'b0;
-                        mAddrP0DataIn      <= 32'd0;
-
-                        port2Result <= {23'd0, mAddrDataOut};
-                    end
-                    3'b011: begin // read block size
-                        port2Result <= {22'd0, blockS};
-                    end
-                    3'b100: begin // read burst size
-                        port2Result <= {24'd0, burstS};
-                    end
-                    3'b101: begin // read status register
-                        port2Result <= {30'd0, status};
-                    end
-                    default: begin
-                        // do nothing
-                    end
-                endcase
+                // `port2Result` is populated below.
                 port2RdDone <= 1'b1;
             end
         end
         else begin
-            bAddrP0WriteEnable <=  1'b0;
-            bAddrP0DataIn      <= 32'd0;
-
-            mAddrP0WriteEnable <=  1'b0;
-            mAddrP0DataIn      <= 32'd0;
-
             port2RdDone <= 1'b0;
-            port2Result <= 32'd0;
         end
     end
 
-    assign done   = port1RdDone || port2RdDone || port1WrDone || port2WrDone;
-    assign result = clock ? port1Result
-                          : 32'd321;
+    assign done = port1RdDone || port2RdDone || port1WrDone || port2WrDone;
+    always @ (*) begin
+        case(map)
+            3'b000: port2Result = memP0DataOut;
+            3'b001: port2Result = bAddrDataOut;
+            3'b010: port2Result = {23'd0, mAddrDataOut};
+            3'b011: port2Result = {22'd0, blockS};
+            3'b100: port2Result = {24'd0, burstS};
+            3'b101: port2Result = {30'd0, status};
+            default:
+                port2Result = 32'd0;
+        endcase
+    end
+    
+    assign result = (port1WrDone || port2WrDone) ? 32'd0
+                                                 : port2RdDone ? port2Result
+                                                               : port1RdDone ? memP1DataOut
+                                                               : 32'd0;
     /*
+    always @ (*) begin
+        if (port1WrDone || port2WrDone)
+            result = 32'd0;
+        else begin
+            if (port2RdDone)
+                result = port2Result;
+            if (port1RdDone)
+                result = memP1DataOut;
+        end
+    end
+    */
     localparam idle       = 3'd0,
                request    = 3'd1,
                granted    = 3'd2,
@@ -277,24 +213,24 @@ module ramDmaCi #(parameter [7:0] customId = 8'h00)
               next;
     reg [7:0] txProgress;      // single transaction progress (descending)
     reg [9:0] dataProgress;    // aggregate transfer progress (ascending)
-    reg       readNotWriteReg; // data transfer direction
-    reg       dmaUpdatingMem,
-              dmaUpdatingBAddr,
-              dmaUpdatingMAddr;
-
+    reg       readNotWriteReg, // data transfer direction
+              memTraffic;      // whether there is ongoing SRAM traffic
     // state transition
     always @ (negedge clock) begin
-        if (reset) begin
+        if (reset)
             current <= idle;
-
-            txProgress   <=  8'd0;
-            dataProgress <= 10'd0;
-        end
         else begin
             current <= next;
+
+            if (current == 3'd3 || current == 3'd5) begin
+                if (txProgress > 0)
+                    txProgress <= txProgress - 1;
+                dataProgress <= dataProgress + 1;
+            end
         end
     end
     // helper function to computing number of words to be transferred
+    /*
     function [9:0] remaining;
     input [9:0] blockS,
                 dataProgress;
@@ -302,6 +238,7 @@ module ramDmaCi #(parameter [7:0] customId = 8'h00)
         remaining = blockS - dataProgress;
     end
     endfunction
+    */
     // next state logic
     always @ (*) begin
         case (current)
@@ -313,7 +250,10 @@ module ramDmaCi #(parameter [7:0] customId = 8'h00)
                 else
                     next = idle;
                 
+                txProgress = 0;
                 dataProgress = 0;
+
+                memTraffic = 1'b0;
             end
             request: begin
                 if (busErrorIn)
@@ -329,15 +269,14 @@ module ramDmaCi #(parameter [7:0] customId = 8'h00)
                 else begin
                     if (readNotWriteReg) begin // read from bus
                         next = read;
-                        dmaUpdatingMem = 1'b1;
                     end
                     else // write to bus
                         next = write;
 
-                    if (remaining(blockS, dataProgress) > burstS + 1)
+                    if (blockS - dataProgress > burstS + 1)
                         txProgress = burstS;
                     else
-                        txProgress = remaining(blockS, dataProgress);
+                        txProgress = blockS - dataProgress;
                     // `dataProgress` reset in `idle` state
                 end
             end
@@ -350,7 +289,7 @@ module ramDmaCi #(parameter [7:0] customId = 8'h00)
                     else if (txProgress == 0) begin
                         if (endTransactionIn && !busyIn) begin
                             next = rdComplete;
-                            dmaUpdatingMem = 1'b0;
+                            memTraffic = 1'b0;
                         end
                         //else if (dataValidIn && !busyIn)
                         //    next = read;
@@ -361,16 +300,17 @@ module ramDmaCi #(parameter [7:0] customId = 8'h00)
                         next = error;
 
                     if (dataValidIn && !busyIn) begin
-                        //mem[mAddr] = addressDataIn;
+                        // `addressDataIn` written to `mem[mAddr]`
 
-                        bAddr = bAddr + 4;
-                        mAddr = mAddr + 1;
+                        //bAddr = bAddr + 4;
+                        //mAddr = mAddr + 1;
 
-                        if (txProgress > 0)
-                            txProgress = txProgress - 1;
-                        dataProgress = dataProgress + 1;
+                        //if (txProgress > 0)
+                        //    txProgress = txProgress - 1;
+                        //dataProgress = dataProgress + 1;
                     end
                 end
+                memTraffic = 1'b1;
             end
             rdComplete: begin
                 if (dataProgress == blockS)
@@ -385,8 +325,10 @@ module ramDmaCi #(parameter [7:0] customId = 8'h00)
                     if (txProgress > 0)
                         next = write;
                     else if (txProgress == 0) begin
-                        if (!busyIn)
+                        if (!busyIn) begin
                             next = wrComplete;
+                            memTraffic = 1'b0;
+                        end
                         else
                             next = write;
                     end
@@ -394,20 +336,22 @@ module ramDmaCi #(parameter [7:0] customId = 8'h00)
                         next = error;
 
                     if (!busyIn) begin                        
-                        bAddr = bAddr + 4;
-                        mAddr = mAddr + 1;
+                        //bAddr = bAddr + 4;
+                        //mAddr = mAddr + 1;
 
-                        if (txProgress > 0)
-                            txProgress = txProgress - 1;
-                        dataProgress = dataProgress + 1;
+                        //if (txProgress > 0)
+                        //    txProgress = 234;//txProgress - 1;
+                        //dataProgress = dataProgress + 1;
                     end
                 end
+                memTraffic = 1'b1;
             end
             wrComplete: begin
                 if (dataProgress == blockS)
                     next = idle;
                 else 
                     next = request;
+                memTraffic = 1'b0;
             end
             error: begin
                 if (!busErrorIn)
@@ -447,12 +391,12 @@ module ramDmaCi #(parameter [7:0] customId = 8'h00)
             end
             granted: begin
                 requestOut          = 1'b0;
-                addressDataOut      = bAddr;
+                addressDataOut      = bAddrDataOut;
                 byteEnablesOut      = readNotWriteReg ? 4'h0 : 4'hF;
-                if (remaining(blockS, dataProgress) > burstS + 1)
+                if (blockS - dataProgress > burstS + 1)
                     burstSizeOut = burstS;
                 else
-                    burstSizeOut = remaining(blockS, dataProgress);
+                    burstSizeOut = blockS - dataProgress;
                 readNotWriteOut     = readNotWriteReg;
                 beginTransactionOut = 1'b1;
                 endTransactionOut   = 1'b0;
@@ -480,7 +424,7 @@ module ramDmaCi #(parameter [7:0] customId = 8'h00)
             end
             write: begin
                 requestOut          = 1'b0;
-                addressDataOut      = mem[mAddr];
+                addressDataOut      = memP0DataOut;
                 byteEnablesOut      = 4'd0;
                 burstSizeOut        = 8'd0;
                 readNotWriteOut     = 1'b0;
@@ -520,5 +464,4 @@ module ramDmaCi #(parameter [7:0] customId = 8'h00)
             end
         endcase
     end
-    */
 endmodule

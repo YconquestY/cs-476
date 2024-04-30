@@ -22,49 +22,60 @@ module cMem #(parameter width =  8'd32,
 
     always @ (posedge clock) begin
         if (reset) begin
-            for (i = 0; i < depth; i = i + 1) begin
-                mem[i] <= {width{1'b0}};
-            end
-            p0DataOut <= {width{1'b0}};
+            //for (i = 0; i < depth; i = i + 1) begin
+            //    mem[i] <= {width{1'b0}};
+            //end
+            //p0DataOut <= {width{1'b0}};
             p1DataOut <= {width{1'b0}};
-            p1DataBuffer <= {width{1'b0}};
+            //p1DataBuffer <= {width{1'b0}};
         end
         // Port 1 (CPU, `p1…`) has higher prority than port 0 (DMA controller,
         // `p0…`).
-        else begin
-            if (p1WriteEnable)
-                mem[p1AddressIn] <= p1DataIn;
+        else if (p1WriteEnable) begin
+            //mem[p1AddressIn] <= p1DataIn;
             
-            //p1DataBuffer <= mem[p1AddressIn];
-
-            p0DataOut <= mem[p0AddressIn];
+            //p0DataOut <= mem[p0AddressIn];
             p1DataOut <= p1DataBuffer; // 2-cycle read latency
+        end
+        else begin
+            //p0DataOut <= mem[p0AddressIn];
+            p1DataOut <= p1DataBuffer;
         end
     end
 
     always @ (negedge clock) begin
-        // reset done upon rising edge
+        if (reset) begin
+            p1DataBuffer <= {width{1'b0}};
+
+            p0DataOut <= {width{1'b0}};
+            for (i = 0; i < depth; i = i + 1) begin
+                mem[i] <= {width{1'b0}};
+            end
+        end
         if (p0WriteEnable && p1WriteEnable) begin
             if (sameAddr) begin
+                mem[p1AddressIn] <= p1DataIn;
                 // port 1 already written upon rising edge
-                p0DataOut <= mem[p0AddressIn];
+                p0DataOut <= p1DataIn;
             end
             else begin // write to different addresse: no race
-                mem[p0AddressIn] <= p0DataIn;
+                mem[p1AddressIn] <= p1DataIn;
                 // port 1 already written upon rising edge
-
+                mem[p0AddressIn] <= p0DataIn;
+                
                 p0DataOut <= p0DataIn;
-                p1DataOut <= p1DataBuffer;
             end
             p1DataBuffer <= p1DataIn;
+            //p1DataOut <= p1DataIn;
         end
         else if (p1WriteEnable) begin
+            mem[p1AddressIn] <= p1DataIn;
             // port 1 already written upon rising edge
             p1DataBuffer <= p1DataIn;
 
             p0DataOut <= sameAddr ? p1DataIn
                                   : mem[p0AddressIn];
-            p1DataOut <= p1DataBuffer;
+            //p1DataOut <= p1DataIn;
         end
         else if (p0WriteEnable) begin
             mem[p0AddressIn] <= p0DataIn;
@@ -75,13 +86,13 @@ module cMem #(parameter width =  8'd32,
                 p1DataBuffer <= mem[p1AddressIn];
             
             p0DataOut <= p0DataIn;
-            p1DataOut <= p1DataBuffer;
+            //p1DataOut <= mem[p1AddressIn];
         end
         else begin
             p1DataBuffer <= mem[p1AddressIn];
             
             p0DataOut <= mem[p0AddressIn];
-            p1DataOut <= p1DataBuffer;
+            //p1DataOut <= mem[p1AddressIn];
         end
     end
 endmodule
