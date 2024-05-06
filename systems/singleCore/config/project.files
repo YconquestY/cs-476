@@ -20,9 +20,8 @@
 ../../../modules/grayscaleCi/verilog/rgb565Grayscale.v
 ../../../modules/grayscaleCi/verilog/rgb565ISE.v
 ../../../modules/gpio/verilog/gpio.v
-../../../modules/dma/verilog/cReg.v
-../../../modules/dma/verilog/cMem.v
-../../../modules/dma/verilog/ramDmaCi.v
+../../../modules/ramDmaCi/verilog/dualPortSSram.v
+../../../modules/ramDmaCi/verilog/ramDmaCi.v
 ../../../modules/camera/verilog/camera.v
 ../../../modules/delay/verilog/delayIse.v
 ../../../modules/swapbyteIse/verilog/swapByteIse.v
