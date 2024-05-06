@@ -1,9 +1,9 @@
-module rgb565Grayscale( input wire [15:0] rgb565,
-                        output wire [7:0] grayscale );
+module rgb5652Grayscale(input  wire [15:0] rgb565,
+                        output wire [ 7:0] grayscale);
 
-  wire [7:3] s_red = rgb565[15:11];
-  wire [7:2] s_green = rgb565[10:5];
-  wire [7:3] s_blue = rgb565[4:0];
+  wire [7:3] s_red   = rgb565[15:11];
+  wire [7:2] s_green = rgb565[10: 5];
+  wire [7:3] s_blue  = rgb565[ 4: 0];
   
   /* Here we determine red * 54 or red * 00110110b */
   wire [10:4] s_redx2 = {2'd0,s_red};
