@@ -1,4 +1,4 @@
-module rgb5652GrayscaleIse (input  wire [31:0]  pixelWord,
+module rgb5652GrayscaleIse (input  wire [31:0] pixelWord,
                             output wire [31:0] grayscalePixelWord);
 
   /* we compensate here for the big/little endian problem */
@@ -14,10 +14,10 @@ module rgb5652GrayscaleIse (input  wire [31:0]  pixelWord,
                                pixel1Grayscale[7:2],  // G1
                                pixel1Grayscale[7:3]}; // B1
 
-  rgb565Grayscale pixel1 (.rgb565({pixelWord[7:0],pixelWord[15:8]}),
+  rgb565Grayscale pixel1 (.rgb565({pixelWord[15:0]}),
                           //.grayscale(s_grayScaleValues[23:16]));
                           .grayscale(pixel1Grayscale));
-  rgb565Grayscale pixel2 (.rgb565({pixelWord[23:16],pixelWord[31:24]}),
+  rgb565Grayscale pixel2 (.rgb565({pixelWord[31:16]}),
                           //.grayscale(s_grayScaleValues[31:24]));
                           .grayscale(pixel2Grayscale));
 endmodule
