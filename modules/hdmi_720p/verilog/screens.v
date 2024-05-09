@@ -291,7 +291,10 @@ module screens #( parameter [31:0] baseAddress = 32'h00000000,
   wire [31:0] s_dualPixelData1, s_dualPixelData2;
   wire [31:0] s_dualPixelData = (s_writeIndex == 1'b1) ? s_dualPixelData1 : s_dualPixelData2;
   wire [15:0] s_grayPixel = {s_selectedGrayData[7:3],s_selectedGrayData[7:2],s_selectedGrayData[7:3]};
-  wire [15:0] s_pixelData = (s_grayscale == 1'b1) ? s_grayPixel : (s_selectReg == 1'b1) ? s_dualPixelData[31:16] : s_dualPixelData[15:0];
+  //wire [15:0] s_pixelData = (s_grayscale == 1'b1) ? s_grayPixel : (s_selectReg == 1'b1) ? s_dualPixelData[31:16] : s_dualPixelData[15:0];
+  wire [15:0] s_pixelData = (s_grayscale == 1'b1) ? s_grayPixel
+                                                  : (s_selectReg == 1'b1) ? {s_dualPixelData[15:11], s_dualPixelData[15:10], s_dualPixelData[15:11]}
+                                                                          : {s_dualPixelData[ 7: 3], s_dualPixelData[ 7: 2], s_dualPixelData[ 7: 3]};
   wire [31:0] s_pixelWriteData;
   wire [8:0]  s_pixelWriteAddress;
   wire        s_pixelWe, s_newScreenSlow, s_newLineSlow, s_writeIndex, s_dualPixel;
@@ -350,7 +353,7 @@ module screens #( parameter [31:0] baseAddress = 32'h00000000,
                         .newLine(s_newLineSlow),
                         .bufferWe(s_pixelWe),
                         .bufferAddress(s_pixelWriteAddress),
-                        .bufferData(s_pixelWriteData),
+                        .bufferData(s_pixelWriteData), // 
                         .writeIndex(s_writeIndex),
                         .dualPixel(s_dualPixel),
                         .grayscale(s_grayscale),

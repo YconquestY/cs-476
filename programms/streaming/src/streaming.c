@@ -3,7 +3,7 @@
 #include <swap.h>
 #include <vga.h>
 
-#define __RGB565__
+//#define __RGB565__
 
 int main () {
   const uint8_t sevenSeg[10] = {0x3F,0x06,0x5B,0x4F,0x66,0x6D,0x7D,0x07,0x7F,0x6F};
@@ -32,7 +32,7 @@ int main () {
   vga[3] = swap_u32((uint32_t) &rgb565[0]);
   enableContinues((uint32_t) &rgb565[0]);
 #else
-  vga[2] = swap_u32(2);
+  vga[2] = swap_u32(1);
   vga[3] = swap_u32((uint32_t) &grayscale[0]);
   enableContinues((uint32_t) &grayscale[0]);
 #endif
