@@ -5,7 +5,11 @@
 
 #define __WITH_CI
 
+volatile uint32_t ping[256],
+                  pong[256];
 int main () {
+  const uint32_t writeBit = 1<<9;
+
   const uint8_t sevenSeg[10] = {0x3F,0x06,0x5B,0x4F,0x66,0x6D,0x7D,0x07,0x7F,0x6F};
   volatile uint16_t rgb565[640*480];
   volatile uint8_t grayscale[640*480];
@@ -29,6 +33,20 @@ int main () {
   uint32_t grayPixels;
   vga[2] = swap_u32(2);
   vga[3] = swap_u32((uint32_t) &grayscale[0]);
+  // Reset memory
+  for (uint32_t ramAddr = 0; ramAddr < 512; ramAddr++) {
+    asm volatile("l.nios_rrr r0,%[in1],r0,20" ::[in1] "r"(ramAddr | writeBit));
+  }
+  printf("DMA memory is cleared.\n");
+  // Reset buffers
+  for (uint32_t ramAddr = 0; ramAddr < 512; ramAddr++) {
+    ping[ramAddr] = 0;
+    pong[ramAddr] = 0;
+  }
+  printf("Buffers are cleared.\n");
+  // iteration 0
+  // iteration 1 ~ 598
+  // iteration 599
   while(1) {
     takeSingleImageBlocking((uint32_t) &rgb565[0]);
     asm volatile ("l.nios_rrr r0,r0,%[in2],0xC"::[in2]"r"(7));

@@ -23,7 +23,7 @@ To be able to build the Virtual Prototype hardware, there are several files:
 | ---          | ---          |
 |  9 | Convert $4$ $16$-bit pixels in RGB565 format to $4$ $8$-bit grayscale pixels, stored collectively in a $32$-bit result |
 | 12 | Configure performance counters for profiling |
-| 52 | Configure peripheral DMA controller|
+| 20 | Configure peripheral DMA controller|
 
 bit 27 of `busRequests` and `busGrants` reserved for DMA controller
 
