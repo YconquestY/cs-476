@@ -49,15 +49,10 @@ int main () {
   vga[2] = swap_u32(2);
   vga[3] = swap_u32((uint32_t) &grayscale[0]);
 
-  uint32_t rgb565Pixels12, // TODO: endianess
+  uint32_t rgb565Pixels12,
            rgb565Pixels34;
   uint32_t grayscalePixels1234;
   while(1) {
-    //uint32_t* rgb565Ptr    = (uint32_t*) &rgb565[0];
-    //uint32_t* grayscalePtr = (uint32_t*) &grayscale[0];
-
-    uint32_t val;
-
     takeSingleImageBlocking((uint32_t) &rgb565[0]);
 /*
     asm volatile ("l.nios_rrr r0,r0,%[in2],0xC"::[in2]"r"(7));
@@ -69,11 +64,7 @@ int main () {
 */
 
     // Iteration 0
-/*
-    for (uint32_t i = 0; i < 256; i++) {
-      printf("%03d target: %08x\t%04x%04x\n", i, rgb565Ptr[i], rgb565[2*i], rgb565[2*i+1]);
-    }
-*/
+
     // DMA-transfer 512 RGB565 pixels from bus to Ci-memory
     asm volatile("l.nios_rrr r0,%[in1],%[in2],20" ::[in1] "r"(busStartAddrCfg | writeBit), // Write bus start address
                                                     [in2] "r"((uint32_t) &rgb565[0]));
@@ -92,30 +83,6 @@ int main () {
       asm volatile("l.nios_rrr %[out1],%[in1],r0,20" :[out1]"=r"(camStatus)
                                                      :[in1] "r"(statusControl));
     }
-/*
-    uint32_t target = rgb565Ptr[512 / 2 - 1];
-    asm volatile("l.nios_rrr %[out1],%[in1],r0,20" :[out1]"=r"(val) // Read last buffer cell
-                                                   :[in1] "r"((uint32_t) 255));
-    while (val != target) {
-      asm volatile("l.nios_rrr %[out1],%[in1],r0,20" :[out1]"=r"(val) // Read last buffer cell
-                                                     :[in1] "r"((uint32_t) 255));
-      printf("000 waiting for 512 pixels written, current: %x, target: %x\n", val, target);
-    }
-*/
-/*
-    for (uint32_t i = 0; i < 256; i++) {
-      asm volatile("l.nios_rrr %[out1],%[in1],r0,20" :[out1]"=r"(val)
-                                                     :[in1] "r"(i));
-      printf("%03d current: %08x\n", i, val);
-    }
-*/
-/*
-    asm volatile("l.nios_rrr %[out1],%[in1],r0,20" :[out1]"=r"(val)
-                                                   :[in1] "r"((uint32_t) 0));
-    printf("Ci-memory[0] = %x", val);
-*/
-    //return -1;
-
     // Iteration 0 ~ 598
     
     for (uint32_t i = 0; i < 598; i++)
@@ -132,8 +99,6 @@ int main () {
       asm volatile("l.nios_rrr r0,%[in1],%[in2],20" ::[in1]"r"(statusControl | writeBit), // Start DMA transfer: from bus to Ci-memory
                                                       [in2]"r"(1));
       // Overwrite this part with grayscale pixels
-      uint32_t ciRamAddr;
-      //uint32_t bufferEndAddr;
       for (uint32_t j = 0; j < 256; j = j + 2)
       { // Read 4 RGB565 pixels
         asm volatile("l.nios_rrr %[out1],%[in1],r0,20" :[out1]"=r"(rgb565Pixels12)
@@ -147,27 +112,10 @@ int main () {
                                                             :[in1] "r" (rgb565Pixels12),
                                                              [in2] "r" (rgb565Pixels34));
         // Write grayscale pixels back to Ci-memory
-        ciRamAddr = i & ((uint32_t) 1) ? pongCiRamAddr + j / 2
-                                       : pingCiRamAddr + j / 2;
-        //printf("%03d writing 0xFFFFFFFF to Ci-memory #%03d\n", i, ciRamAddr);
-        asm volatile("l.nios_rrr r0,%[in1],%[in2],20" ::[in1] "r"(ciRamAddr | writeBit),
+        asm volatile("l.nios_rrr r0,%[in1],%[in2],20" ::[in1] "r"((i & ((uint32_t) 1) ? pongCiRamAddr + j / 2
+                                                                                      : pingCiRamAddr + j / 2) | writeBit),
                                                         [in2] "r"(grayscalePixels1234));
       }
-/*
-      // Verify GRAY pixels
-      uint32_t tmp;
-      for (uint32_t j = 0; j < 128; j++)
-      {
-        ciRamAddr = i & ((uint32_t) 1) ? pongCiRamAddr + j
-                                       : pingCiRamAddr + j;
-        asm volatile("l.nios_rrr %[out1],%[in1],r0,20" :[out1]"=r"(tmp)
-                                                       :[in1] "r"(ciRamAddr));
-        if (tmp != (uint32_t) 0x80808080) {
-          printf("%03d Ci-memory #%03d write error: %x\n", i, ciRamAddr, tmp);
-          return -1;
-        }
-      }
-*/
       // Verify DMA transfer to the other part is done
       asm volatile("l.nios_rrr %[out1],%[in1],r0,20" :[out1]"=r"(camStatus) // Read status register
                                                      :[in1] "r"(statusControl));
@@ -175,17 +123,6 @@ int main () {
         asm volatile("l.nios_rrr %[out1],%[in1],r0,20" :[out1]"=r"(camStatus)
                                                        :[in1] "r"(statusControl));
       }
-/*
-      bufferEndAddr = i & ((uint32_t) 1) ? (uint32_t) 255
-                                         : (uint32_t) 511;
-      asm volatile("l.nios_rrr %[out1],%[in1],r0,20" :[out1]"=r"(val) // Read last buffer cell
-                                                     :[in1] "r"(bufferEndAddr));
-      while (val != rgb565Ptr[512 / 2 * (i+1) - 1]) {
-        asm volatile("l.nios_rrr %[out1],%[in1],r0,20" :[out1]"=r"(val) // Read last buffer cell
-                                                       :[in1] "r"(bufferEndAddr));
-        printf("%03d waiting for 512 pixels written to the other buffer\n", i + 1);
-      }
-*/
       // DMA-transfer 512 grayscale pixels to screen
       asm volatile("l.nios_rrr r0,%[in1],%[in2],20" ::[in1]"r"(busStartAddrCfg | writeBit), // Write bus start address
                                                       [in2]"r"((uint32_t) &grayscale[i * 512]));
@@ -205,15 +142,9 @@ int main () {
         asm volatile("l.nios_rrr %[out1],%[in1],r0,20" :[out1]"=r"(screenStatus)
                                                        :[in1] "r"(statusControl));
       }
-/*
-      while (grayscalePtr[512 / 4 * i - 1] != 0x80808080) {
-        printf("%03d waiting for 512 pixels written to screen\n", i);
-      }
-*/
     }
     // iteration 599
 
-    uint32_t ciRamAddr;
     // Overwrite this part with grayscale pixels
     for (uint32_t j = 0; j < 256; j = j + 2)
     { // Read 4 RGB565 pixels
@@ -226,24 +157,9 @@ int main () {
                                                           :[in1] "r" (rgb565Pixels12),
                                                            [in2] "r" (rgb565Pixels34));
       // Write grayscale pixels back to Ci-memory
-      ciRamAddr = pongCiRamAddr + j / 2;
-      asm volatile("l.nios_rrr r0,%[in1],%[in2],20" ::[in1] "r"(ciRamAddr | writeBit),
+      asm volatile("l.nios_rrr r0,%[in1],%[in2],20" ::[in1] "r"((pongCiRamAddr + j / 2) | writeBit),
                                                       [in2] "r"(grayscalePixels1234));
     }
-/*
-    // Verify GRAY pixels
-    uint32_t tmp;
-    for (uint32_t j = 0; j < 128; j++)
-    {
-      ciRamAddr = pongCiRamAddr + j;
-      asm volatile("l.nios_rrr %[out1],%[in1],r0,20" :[out1]"=r"(tmp)
-                                                     :[in1] "r"(ciRamAddr));
-      if (tmp != (uint32_t) 0x80808080) {
-        printf("599 Ci-memory #%03d write error: %x\n", ciRamAddr, tmp);
-        return -1;
-      }
-    }
-*/
     // DMA-transfer 512 grayscale pixels to screen
     asm volatile("l.nios_rrr r0,%[in1],%[in2],20" ::[in1]"r"(busStartAddrCfg | writeBit), // Write bus start address
                                                     [in2]"r"((uint32_t) &grayscale[599 * 512]));
