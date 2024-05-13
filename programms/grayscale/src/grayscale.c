@@ -54,8 +54,8 @@ int main () {
   uint32_t grayscalePixels1234;
   while(1) {
     takeSingleImageBlocking((uint32_t) &rgb565[0]);
-/*
     asm volatile ("l.nios_rrr r0,r0,%[in2],0xC"::[in2]"r"(7));
+/*
     uint32_t dipswitch = swap_u32(gpio[0])^0xFF;
     uint32_t hunderds = dipswitch/100;
     uint32_t tens = (dipswitch%100)/10;
@@ -206,11 +206,9 @@ int main () {
     }
 #endif
 */
-/*
     asm volatile ("l.nios_rrr %[out1],r0,%[in2],0xC":[out1]"=r"(cycles):[in2]"r"(1<<8|7<<4));
     asm volatile ("l.nios_rrr %[out1],%[in1],%[in2],0xC":[out1]"=r"(stall):[in1]"r"(1),[in2]"r"(1<<9));
     asm volatile ("l.nios_rrr %[out1],%[in1],%[in2],0xC":[out1]"=r"(idle):[in1]"r"(2),[in2]"r"(1<<10));
     printf("nrOfCycles: %d %d %d\n", cycles, stall, idle);
-*/
   }
 }
