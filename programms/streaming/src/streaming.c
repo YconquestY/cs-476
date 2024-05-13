@@ -32,7 +32,7 @@ int main () {
   vga[3] = swap_u32((uint32_t) &rgb565[0]);
   enableContinues((uint32_t) &rgb565[0]);
 #else
-  vga[2] = swap_u32(1);
+  vga[2] = swap_u32(2);
   vga[3] = swap_u32((uint32_t) &grayscale[0]);
   enableContinues((uint32_t) &grayscale[0]);
 #endif

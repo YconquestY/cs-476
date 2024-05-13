@@ -188,7 +188,10 @@ module camera #(parameter [7:0] customInstructionId = 8'd0,
                              //.dataIn1(s_pixelWord),
                              .dataIn1({16'd0, s_grayscalePixelWord}),
                              .dataOut2(s_busPixelWord));
-
+  reg [15:0] grayscaleLineBuffer;
+  always @ (clock) begin
+    grayscaleLineBuffer <= s_busPixelWord[15:0];
+  end
   /*
    *
    * Here the bus interface is defined
@@ -231,9 +234,9 @@ module camera #(parameter [7:0] customInstructionId = 8'd0,
       beginTransactionOut    <= (s_stateMachineReg == INIT_BURST1) ? 1'd1 : 1'd0;
       byteEnablesOut         <= (s_stateMachineReg == INIT_BURST1) ? 4'hF : 4'd0;
       s_addressDataOutReg    <= (s_stateMachineReg == INIT_BURST1) ? s_busAddressReg : 
-                                (s_doWrite == 1'b1) ? s_busPixelWord :
+                                (s_doWrite == 1'b1) ? {grayscaleLineBuffer, s_busPixelWord[15:0]} :
                                 (busyIn == 1'b1) ? s_addressDataOutReg : 32'd0;
-      s_dataValidReg         <= (s_doWrite == 1'b1) ? 1'b1 : (busyIn == 1'b1) ? s_dataValidReg : 1'b0;
+      s_dataValidReg         <= (s_doWrite == 1'b1) ? s_busSelectReg[0] : (busyIn == 1'b1) ? s_dataValidReg : 1'b0;
       endTransactionOut      <= (s_stateMachineReg == END_TRANS1 || s_stateMachineReg == END_TRANS2) ? 1'b1 : 1'b0;
       burstSizeOut           <= (s_stateMachineReg == INIT_BURST1) ? s_burstSizeNext - 8'd1 : 8'd0;
       s_burstCountReg        <= (s_stateMachineReg == INIT_BURST1) ? s_burstSizeNext - 8'd1 :
