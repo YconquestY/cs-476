@@ -167,9 +167,13 @@ module camera #(parameter [7:0] customInstructionId = 8'd0,
   wire [31:0] s_busPixelWord;
   wire [31:0] s_pixelWord = {s_byte1Reg,camData,     // `pixel2`
                              s_byte3Reg,s_byte2Reg}; // `pixel1`
-  wire [15:0] s_grayscalePixelWord;
-  wire s_weLineBuffer = (s_pixelCountReg[1:0] == 2'b11) ? hsync : 1'b0;
+  reg  [31:0] s_pixelWordReg;
+  wire [15:0] s_grayscalePixelWordPrev,
+              s_grayscalePixelWord;
+  wire s_weLineBuffer = (s_pixelCountReg[2:0] == 3'b111) ? hsync : 1'b0;
 
+  rgb5652GrayscaleIse grayscaleConverterPrev(.pixelWord(s_pixelWordReg),
+                                             .grayscalePixelWord(s_grayscalePixelWordPrev));
   rgb5652GrayscaleIse grayscaleConverter(.pixelWord(s_pixelWord),
                                          .grayscalePixelWord(s_grayscalePixelWord));
   
@@ -178,15 +182,15 @@ module camera #(parameter [7:0] customInstructionId = 8'd0,
       s_byte3Reg <= (s_pixelCountReg[1:0] == 2'b00 && hsync == 1'b1) ? camData : s_byte3Reg;
       s_byte2Reg <= (s_pixelCountReg[1:0] == 2'b01 && hsync == 1'b1) ? camData : s_byte2Reg;
       s_byte1Reg <= (s_pixelCountReg[1:0] == 2'b10 && hsync == 1'b1) ? camData : s_byte1Reg;
+      s_pixelWordReg <= (s_pixelCountReg[1:0] == 2'b11 && hsync == 1'b1) ? s_pixelWord : s_pixelWordReg;
     end
   
-  dualPortRam2k lineBuffer ( .address1(s_pixelCountReg[10:2]),
+  dualPortRam2k lineBuffer ( .address1(s_pixelCountReg[10:3]),
                              .address2(s_busSelectReg),
                              .clock1(pclk),
                              .clock2(clock),
                              .writeEnable(s_weLineBuffer),
-                             //.dataIn1(s_pixelWord),
-                             .dataIn1({16'd0, s_grayscalePixelWord}),
+                             .dataIn1({s_grayscalePixelWord, s_grayscalePixelWordPrev}),
                              .dataOut2(s_busPixelWord));
   reg [15:0] grayscaleLineBuffer;
   always @ (clock) begin
@@ -234,13 +238,13 @@ module camera #(parameter [7:0] customInstructionId = 8'd0,
       beginTransactionOut    <= (s_stateMachineReg == INIT_BURST1) ? 1'd1 : 1'd0;
       byteEnablesOut         <= (s_stateMachineReg == INIT_BURST1) ? 4'hF : 4'd0;
       s_addressDataOutReg    <= (s_stateMachineReg == INIT_BURST1) ? s_busAddressReg : 
-                                (s_doWrite == 1'b1) ? {grayscaleLineBuffer, s_busPixelWord[15:0]} :
+                                (s_doWrite == 1'b1) ? s_busPixelWord :
                                 (busyIn == 1'b1) ? s_addressDataOutReg : 32'd0;
-      s_dataValidReg         <= (s_doWrite == 1'b1) ? s_busSelectReg[0] : (busyIn == 1'b1) ? s_dataValidReg : 1'b0;
+      s_dataValidReg         <= (s_doWrite == 1'b1) ? 1'b1 : (busyIn == 1'b1) ? s_dataValidReg : 1'b0;
       endTransactionOut      <= (s_stateMachineReg == END_TRANS1 || s_stateMachineReg == END_TRANS2) ? 1'b1 : 1'b0;
       burstSizeOut           <= (s_stateMachineReg == INIT_BURST1) ? s_burstSizeNext - 8'd1 : 8'd0;
       s_burstCountReg        <= (s_stateMachineReg == INIT_BURST1) ? s_burstSizeNext - 8'd1 :
-                                (s_doWrite == 1'b1) ? s_burstCountReg - 9'd1 : s_burstCountReg;
+                                (s_doWrite == 1'b1) ? s_burstCountReg - 9'd2 : s_burstCountReg;
       s_busSelectReg         <= (s_stateMachineReg == IDLE) ? 9'd0 : (s_doWrite == 1'b1) ? s_busSelectReg + 9'd1 : s_busSelectReg;
       s_nrOfPixelsPerLineReg <= (s_newLine == 1'b1) ? s_pixelCountValueReg[10:2] : 
                                 (s_stateMachineReg == INIT_BURST1) ? s_nrOfPixelsPerLineReg - {1'b0,s_burstSizeNext} : s_nrOfPixelsPerLineReg;
