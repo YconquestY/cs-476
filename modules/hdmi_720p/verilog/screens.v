@@ -300,8 +300,8 @@ module screens #( parameter [31:0] baseAddress = 32'h00000000,
 
   always @*
     case (s_graySelectReg)
-       2'd0: s_selectedGrayData <= s_dualPixelData[7:0];
-       2'd1: s_selectedGrayData <= s_dualPixelData[15:8];
+       2'd0: s_selectedGrayData <= s_dualPixelData[ 7: 0];
+       2'd1: s_selectedGrayData <= s_dualPixelData[15: 8];
        2'd2: s_selectedGrayData <= s_dualPixelData[23:16];
        2'd3: s_selectedGrayData <= s_dualPixelData[31:24];
      endcase
